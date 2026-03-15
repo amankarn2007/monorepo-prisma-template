@@ -1,135 +1,84 @@
-# Turborepo starter
+## 🚀 Ultimate Monorepo Prisma Boilerplate
+This is a high-performance, scalable monorepo setup using Turborepo, Prisma, Express, and TypeScript. It is designed to solve common "Module Not Found" and "rootDir" issues that developers face in complex workspace structures.
 
-This Turborepo starter is maintained by the Turborepo core team.
+## 🏗 Project Architectureapps
+    * /backend: Express.js server (The API).
+    * packages/db: Centralized database logic (Prisma Client + Database Driver).
+    * packages/typescript-config: Shared TS configurations.
+    
+# 🛠 Step-by-Step Setup Guide1. 
+    Initialize the Workspace
+    Run the following command to create a fresh Turborepo project
+    **npx create-turbo@latest**
+    Select pnpm or bun as the package manager.Clear the default apps and packages folders if you want a fresh start.
+    
+# 2. Setup the Database Package (@repo/db)Go to packages/db and initialize Prisma:Bashcd packages/db
+    ` pnpm init `
+    ` pnpm add @prisma/client pg dotenv `
+    ` pnpm add -D prisma @types/pg @types/node typescript `
+    ` pnpm exec prisma init `
 
-## Using this example
+## Critical Config: schema.prisma
+    To avoid rootDir errors, generate the client inside the src folder:
+    **generator client {
+        provider = "prisma-client-js"
+        output   = "../src/generated/prisma" 
+    }**
 
-Run the following command:
+### Database Entry Point: src/index.ts
+This file exports a single prismaClient instance to be used by all apps.
 
-```sh
-npx create-turbo@latest
-```
+  * import { PrismaPg } from '@prisma/adapter-pg'
+    import pg from 'pg'
+    import dotenv from 'dotenv'
+    import { dirname, resolve } from 'path'
+    import { fileURLToPath } from 'url'
+    import { PrismaClient } from './generated/prisma/index.js'
 
-## What's inside?
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = dirname(__filename)
 
-This Turborepo includes the following packages/apps:
+    dotenv.config({ path: resolve(__dirname, '../.env') })
 
-### Apps and Packages
+    const connectionString = process.env.DATABASE_URL;
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+    if (!connectionString || connectionString === "undefined") {
+        console.error("ERROR: DATABASE_URL is undefined. Check your .env path!");
+    }
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+    const pool = new pg.Pool({ connectionString })
+    const adapter = new PrismaPg(pool) 
 
-### Utilities
+    export const prismaClient = new PrismaClient({ adapter }) *
 
-This Turborepo has some additional tools already setup for you:
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+# 3. Setup the Backend App (apps/backend).     (cd apps/backend)
+    pnpm init
+    pnpm add express @repo/db@workspace:*
+    pnpm add -D tsx typescript @types/express
 
-### Build
 
-To build all apps and packages, run the following command:
+### Server Entry Point: src/server.tsTypeScriptimport express from "express";
+    import { prismaClient } from "@repo/db/client";
 
-```
-cd my-turborepo
+    const app = express();
+    app.use(express.json());
 
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+    app.get("/users", async (req, res) => {
+        const users = await prismaClient.user.findMany();
+        res.json({ users });
+    });
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+    app.listen(3001, () => console.log("Server running on port 3001"));
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+### 📦 Package Breakdown1. 
+    @repo/db (The Engine)
+        @prisma/client: The core runtime for queries.
+        pg & @prisma/adapter-pg: The driver that lets Prisma talk to PostgreSQL.
+        dotenv: Essential for loading DATABASE_URL from the .env file.
+        @types/node: Required so TypeScript understands process.env and path.
+        
+    2. apps/backend (The Brain)
+        tsx: The development runner. It executes .ts files directly without waiting for a build.
+        express: The web framework for handling HTTP requests.
+        @repo/db: Imported via workspace to allow type-safe DB access.
